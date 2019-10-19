@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">QRScanner</string>
+    <string name="ok">OK</string>
+
+    <!-- QR Code related strings -->
+    <string name="permission_camera_rationale">Access to the camera is needed for detection</string>
+    <string name="no_camera_permission">This application cannot run because it does not have the camera permission.  The application will now exit.</string>
+    <string name="low_storage_error">Face detector dependencies cannot be downloaded due to low device storage</string>
+    <string name="cd_close_button">Atras</string>
+    <string name="cd_flash_button">Toggle camera flash</string>
+    <string name="cd_settings_button">Configuracion</string>
+</resources>
