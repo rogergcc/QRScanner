@@ -1,8 +1,6 @@
 package com.masudias.qrscanner.util;
 
 import android.Manifest;
-import android.animation.AnimatorInflater;
-import android.animation.AnimatorSet;
 import android.annotation.SuppressLint;
 import android.app.AlertDialog;
 import android.app.Dialog;
@@ -14,12 +12,7 @@ import android.content.pm.PackageManager;
 import android.hardware.Camera;
 import android.os.Build;
 import android.os.Bundle;
-import androidx.annotation.NonNull;
 
-import com.google.android.material.chip.Chip;
-import com.google.android.material.snackbar.Snackbar;
-import androidx.core.app.ActivityCompat;
-import androidx.appcompat.app.AppCompatActivity;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.GestureDetector;
@@ -29,16 +22,20 @@ import android.view.View;
 import android.view.Window;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
 import com.google.android.gms.common.api.CommonStatusCodes;
 import com.google.android.gms.vision.MultiProcessor;
 import com.google.android.gms.vision.barcode.Barcode;
 import com.google.android.gms.vision.barcode.BarcodeDetector;
+import com.google.android.material.snackbar.Snackbar;
 import com.masudias.qrscanner.R;
-import com.masudias.qrscanner.util.camera.CameraSource;
-import com.masudias.qrscanner.util.camera.CameraSourcePreview;
-import com.masudias.qrscanner.util.camera.GraphicOverlay;
+import com.masudias.qrscanner.util.camera.CameraSourceBase;
+import com.masudias.qrscanner.util.camera.CameraSourcePreviewBase;
 
 
 import java.io.IOException;
@@ -49,7 +46,7 @@ import java.lang.reflect.Field;
  * rear facing camera. During detection overlay graphics are drawn to indicate the position,
  * size, and ID of each barcode.
  */
-public final class BarcodeCaptureActivity extends AppCompatActivity implements BarcodeGraphicTracker.BarcodeDetectorListener, View.OnClickListener {
+public final class BarcodeCaptureBaseActivity extends AppCompatActivity implements BarcodeGraphicTracker.BarcodeDetectorListener, View.OnClickListener {
     private static final String TAG = "Barcode-reader";
 
     // intent request code to handle updating play services if needed.
@@ -64,8 +61,8 @@ public final class BarcodeCaptureActivity extends AppCompatActivity implements B
     public static final String AutoCapture = "AutoCapture";
     public static final String BarcodeObject = "Barcode";
 
-    private CameraSource mCameraSource;
-    private CameraSourcePreview mPreview;
+    private CameraSourceBase mCameraSource;
+    private CameraSourcePreviewBase mPreview;
     private View mRootView;
     private boolean autoFocus = true, useFlash = false, autoCapture = true;
 
@@ -81,12 +78,6 @@ public final class BarcodeCaptureActivity extends AppCompatActivity implements B
 
     private Camera camera = null;
     boolean flashmode=false;
-    private GraphicOverlay graphicOverlay;
-    private CameraSource cameraSource;
-
-    private Chip promptChip;
-    private AnimatorSet promptChipAnimator;
-
     private void flashOnButton() {
         camera=getCamera(mCameraSource);
         if (camera != null) {
@@ -107,8 +98,8 @@ public final class BarcodeCaptureActivity extends AppCompatActivity implements B
 
         }
     }
-    private static Camera getCamera(@NonNull CameraSource cameraSource) {
-        Field[] declaredFields = CameraSource.class.getDeclaredFields();
+    private static Camera getCamera(@NonNull CameraSourceBase cameraSource) {
+        Field[] declaredFields = CameraSourceBase.class.getDeclaredFields();
 
         for (Field field : declaredFields) {
             if (field.getType() == Camera.class) {
@@ -131,164 +122,136 @@ public final class BarcodeCaptureActivity extends AppCompatActivity implements B
     @Override
     public void onCreate(Bundle icicle) {
         super.onCreate(icicle);
-        setContentView(R.layout.barcode_capture);
+        setContentView(R.layout.activity_barcode_capture_base);
 
-        mPreview = (CameraSourcePreview) findViewById(R.id.preview);
-        graphicOverlay = findViewById(R.id.camera_preview_graphic_overlay);
-        graphicOverlay.setOnClickListener(this);
-        cameraSource = new CameraSource(graphicOverlay);
+        mPreview =  findViewById(R.id.preview);
 
         mRootView = findViewById(R.id.topLayout);
-//        promptChip = findViewById(R.id.bottom_prompt_chip);
-//
-////        promptChip.setText("Bar code Scan");
-//
-//        promptChipAnimator =
-//                (AnimatorSet) AnimatorInflater.loadAnimator(this, R.animator.bottom_prompt_chip_enter);
-//        promptChipAnimator.setTarget(promptChip);
-
-        findViewById(R.id.close_button).setOnClickListener(this);
         // Check for the camera permission before accessing the camera.  If the
         // permission is not granted yet, request permission.
-//        int rc = ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA);
-//        if (rc == PackageManager.PERMISSION_GRANTED)
-//            createCameraSource(autoFocus,useFlash);
-//        else
-//            requestCameraPermission();
+        int rc = ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA);
+        if (rc == PackageManager.PERMISSION_GRANTED)
+            createCameraSource(autoFocus,useFlash);
+        else
+            requestCameraPermission();
 
         flashButton = findViewById(R.id.flash_button);
         flashButton.setOnClickListener(this);
 
-        startCameraSource();
-//        scaleGestureDetector = new ScaleGestureDetector(this, new ScaleListener());
+
+        scaleGestureDetector = new ScaleGestureDetector(this, new ScaleListener());
     }
 
 
 
-
-//    @Override
-//    public void onClick(View view) {
-//        int id = view.getId();
-//
-//
-//        BarcodeDetector barcodeDetector = new BarcodeDetector.Builder(getApplicationContext() ).build();
-//
-//        DisplayMetrics metrics = new DisplayMetrics();
-//        getWindowManager().getDefaultDisplay().getMetrics(metrics);
-//
-//        CameraSource.Builder builder = new CameraSource.Builder(getApplicationContext(), barcodeDetector)
-//                .setFacing(CameraSource.CAMERA_FACING_BACK)
-//                .setRequestedPreviewSize(metrics.heightPixels, metrics.widthPixels)
-//                .setRequestedFps(30.0f);
-//
-//        if (id == R.id.close_button) {
-//            onBackPressed();
-//
-//        } else if (id == R.id.flash_button) {
-//
-//            if (flashButton.isSelected()) {
-//                flashButton.setSelected(false);
-//
-//
-////                createCameraSource(autoFocus, false);
-//                flashOnButton();
-//
-////                Camera.Parameters parameters = camera.getParameters();
-////                parameters.setFlashMode(Camera.Parameters.FLASH_MODE_OFF);
-////                camera.setParameters(parameters);
-//
-//            } else {
-//                flashButton.setSelected(true);
-//
-//                Toast.makeText(this, "Flash On", Toast.LENGTH_SHORT).show();
-//
-////                createCameraSource(autoFocus, true);
-//                flashOnButton();
-////                Camera.Parameters parameters = camera.getParameters();
-////                parameters.setFlashMode(Camera.Parameters.FLASH_MODE_TORCH);
-////                camera.setParameters(parameters);
-//            }
-//
-//        } else if (id == R.id.settings_button) {
-//            // Sets as disabled to prevent the user from clicking on it too fast.
-//
-//            //startActivity(new Intent(this, SettingsActivity.class));
-//        }
-//
-//    }
 
     @Override
     public void onClick(View view) {
         int id = view.getId();
+
+
+        BarcodeDetector barcodeDetector = new BarcodeDetector.Builder(getApplicationContext() ).build();
+
+        DisplayMetrics metrics = new DisplayMetrics();
+        getWindowManager().getDefaultDisplay().getMetrics(metrics);
+
+        CameraSourceBase.Builder builder = new CameraSourceBase.Builder(getApplicationContext(), barcodeDetector)
+                .setFacing(CameraSourceBase.CAMERA_FACING_BACK)
+                .setRequestedPreviewSize(metrics.heightPixels, metrics.widthPixels)
+                .setRequestedFps(30.0f);
+
+
         if (id == R.id.close_button) {
             onBackPressed();
 
         } else if (id == R.id.flash_button) {
+
             if (flashButton.isSelected()) {
                 flashButton.setSelected(false);
-                cameraSource.updateFlashMode(Camera.Parameters.FLASH_MODE_OFF);
+
+
+//                createCameraSource(autoFocus, false);
+                flashOnButton();
+
+//                Camera.Parameters parameters = camera.getParameters();
+//                parameters.setFlashMode(Camera.Parameters.FLASH_MODE_OFF);
+//                camera.setParameters(parameters);
+
             } else {
                 flashButton.setSelected(true);
-                cameraSource.updateFlashMode(Camera.Parameters.FLASH_MODE_TORCH);
+
+                Toast.makeText(this, "Flash On", Toast.LENGTH_SHORT).show();
+
+//                createCameraSource(autoFocus, true);
+                flashOnButton();
+//                Camera.Parameters parameters = camera.getParameters();
+//                parameters.setFlashMode(Camera.Parameters.FLASH_MODE_TORCH);
+//                camera.setParameters(parameters);
             }
 
+        } else if (id == R.id.settings_button) {
+            // Sets as disabled to prevent the user from clicking on it too fast.
+
+            //startActivity(new Intent(this, SettingsActivity.class));
         }
+
     }
 
 
-//    private class ScaleListener implements ScaleGestureDetector.OnScaleGestureListener {
-//
-//        /**
-//         * Responds to scaling events for a gesture in progress.
-//         * Reported by pointer motion.
-//         *
-//         * @param detector The detector reporting the event - use this to
-//         *                 retrieve extended info about event state.
-//         * @return Whether or not the detector should consider this event
-//         * as handled. If an event was not handled, the detector
-//         * will continue to accumulate movement until an event is
-//         * handled. This can be useful if an application, for example,
-//         * only wants to update scaling factors if the change is
-//         * greater than 0.01.
-//         */
-//        @Override
-//        public boolean onScale(ScaleGestureDetector detector) {
-//            return false;
-//        }
-//
-//        /**
-//         * Responds to the beginning of a scaling gesture. Reported by
-//         * new pointers going down.
-//         *
-//         * @param detector The detector reporting the event - use this to
-//         *                 retrieve extended info about event state.
-//         * @return Whether or not the detector should continue recognizing
-//         * this gesture. For example, if a gesture is beginning
-//         * with a focal point outside of a region where it makes
-//         * sense, onScaleBegin() may return false to ignore the
-//         * rest of the gesture.
-//         */
-//        @Override
-//        public boolean onScaleBegin(ScaleGestureDetector detector) {
-//            return true;
-//        }
-//
-//        /**
-//         * Responds to the end of a scale gesture. Reported by existing
-//         * pointers going up.
-//         * <p/>
-//         * Once a scale has ended, {@link ScaleGestureDetector#getFocusX()}
-//         * and {@link ScaleGestureDetector#getFocusY()} will return focal point
-//         * of the pointers remaining on the screen.
-//         *
-//         * @param detector The detector reporting the event - use this to
-//         *                 retrieve extended info about event state.
-//         */
-//        @Override
-//        public void onScaleEnd(ScaleGestureDetector detector) {
-//            mCameraSource.doZoom(detector.getScaleFactor());
-//        }
-//    }
+
+    private class ScaleListener implements ScaleGestureDetector.OnScaleGestureListener {
+
+        /**
+         * Responds to scaling events for a gesture in progress.
+         * Reported by pointer motion.
+         *
+         * @param detector The detector reporting the event - use this to
+         *                 retrieve extended info about event state.
+         * @return Whether or not the detector should consider this event
+         * as handled. If an event was not handled, the detector
+         * will continue to accumulate movement until an event is
+         * handled. This can be useful if an application, for example,
+         * only wants to update scaling factors if the change is
+         * greater than 0.01.
+         */
+        @Override
+        public boolean onScale(ScaleGestureDetector detector) {
+            return false;
+        }
+
+        /**
+         * Responds to the beginning of a scaling gesture. Reported by
+         * new pointers going down.
+         *
+         * @param detector The detector reporting the event - use this to
+         *                 retrieve extended info about event state.
+         * @return Whether or not the detector should continue recognizing
+         * this gesture. For example, if a gesture is beginning
+         * with a focal point outside of a region where it makes
+         * sense, onScaleBegin() may return false to ignore the
+         * rest of the gesture.
+         */
+        @Override
+        public boolean onScaleBegin(ScaleGestureDetector detector) {
+            return true;
+        }
+
+        /**
+         * Responds to the end of a scale gesture. Reported by existing
+         * pointers going up.
+         * <p/>
+         * Once a scale has ended, {@link ScaleGestureDetector#getFocusX()}
+         * and {@link ScaleGestureDetector#getFocusY()} will return focal point
+         * of the pointers remaining on the screen.
+         *
+         * @param detector The detector reporting the event - use this to
+         *                 retrieve extended info about event state.
+         */
+        @Override
+        public void onScaleEnd(ScaleGestureDetector detector) {
+            mCameraSource.doZoom(detector.getScaleFactor());
+        }
+    }
 
 
     /**
@@ -353,7 +316,7 @@ public final class BarcodeCaptureActivity extends AppCompatActivity implements B
                 .setAction(R.string.ok, new View.OnClickListener() {
                     @Override
                     public void onClick(View view) {
-                        ActivityCompat.requestPermissions(BarcodeCaptureActivity.this, permissions,
+                        ActivityCompat.requestPermissions(BarcodeCaptureBaseActivity.this, permissions,
                                 RC_HANDLE_CAMERA_PERM);
                     }
                 })
@@ -373,130 +336,93 @@ public final class BarcodeCaptureActivity extends AppCompatActivity implements B
      * Suppressing InlinedApi since there is a check that the minimum version is met before using
      * the constant.
      */
-//    @SuppressLint("InlinedApi")
-//    private void createCameraSource(boolean autoFocus, boolean useFlash) {
-//        Context context = getApplicationContext();
-//
-//        // A barcode detector is created to track barcodes.  An associated multi-processor instance
-//        // is set to receive the barcode detection results, track the barcodes, and maintain
-//        // graphics for each barcode on screen.  The factory is used by the multi-processor to
-//        // create a separate tracker instance for each barcode.
-//        BarcodeDetector barcodeDetector = new BarcodeDetector.Builder(context).build();
-//        BarcodeTrackerFactory barcodeFactory = new BarcodeTrackerFactory(autoCapture ? this : null);
-//        barcodeDetector.setProcessor(
-//                new MultiProcessor.Builder<>(barcodeFactory).build());
-//
-//        if (!barcodeDetector.isOperational()) {
-//            // Note: The first time that an app using the barcode or face API is installed on a
-//            // device, GMS will download a native libraries to the device in order to do detection.
-//            // Usually this completes before the app is run for the first time.  But if that
-//            // download has not yet completed, then the above call will not detect any barcodes
-//            // and/or faces.
-//            //
-//            // isOperational() can be used to check if the required native libraries are currently
-//            // available.  The detectors will automatically become operational once the library
-//            // downloads complete on device.
-//            Log.w(TAG, "Detector dependencies are not yet available.");
-//
-//            // Check for low storage.  If there is low storage, the native library will not be
-//            // downloaded, so detection will not become operational.
-//            IntentFilter lowstorageFilter = new IntentFilter(Intent.ACTION_DEVICE_STORAGE_LOW);
-//            boolean hasLowStorage = registerReceiver(null, lowstorageFilter) != null;
-//
-//            if (hasLowStorage) {
-//                Toast.makeText(this, R.string.low_storage_error, Toast.LENGTH_LONG).show();
-//                Log.w(TAG, getString(R.string.low_storage_error));
-//            }
-//        }
-//
-//        DisplayMetrics metrics = new DisplayMetrics();
-//        getWindowManager().getDefaultDisplay().getMetrics(metrics);
-//
-//        // Creates and starts the camera.  Note that this uses a higher resolution in comparison
-//        // to other detection examples to enable the barcode detector to detect small barcodes
-//        // at long distances.
-//        @SuppressWarnings("SuspiciousNameCombination")
-//        CameraSource.Builder builder = new CameraSource.Builder(getApplicationContext(), barcodeDetector)
-//                .setFacing(CameraSource.CAMERA_FACING_BACK)
-//                .setRequestedPreviewSize(metrics.heightPixels, metrics.widthPixels)
-//                .setRequestedFps(30.0f);
-//
-//        // make sure that auto focus is an available option
-//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH)
-//            builder = builder.setFocusMode(
-//                    autoFocus ? Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE : null);
-//
-//        mCameraSource = builder
-//                .setFlashMode(useFlash ? Camera.Parameters.FLASH_MODE_TORCH : null)
-//                .build();
-//    }
+    @SuppressLint("InlinedApi")
+    private void createCameraSource(boolean autoFocus, boolean useFlash) {
+        Context context = getApplicationContext();
+
+        // A barcode detector is created to track barcodes.  An associated multi-processor instance
+        // is set to receive the barcode detection results, track the barcodes, and maintain
+        // graphics for each barcode on screen.  The factory is used by the multi-processor to
+        // create a separate tracker instance for each barcode.
+        BarcodeDetector barcodeDetector = new BarcodeDetector.Builder(context).build();
+        BarcodeTrackerFactory barcodeFactory = new BarcodeTrackerFactory(autoCapture ? this : null);
+        barcodeDetector.setProcessor(
+                new MultiProcessor.Builder<>(barcodeFactory).build());
+
+        if (!barcodeDetector.isOperational()) {
+            // Note: The first time that an app using the barcode or face API is installed on a
+            // device, GMS will download a native libraries to the device in order to do detection.
+            // Usually this completes before the app is run for the first time.  But if that
+            // download has not yet completed, then the above call will not detect any barcodes
+            // and/or faces.
+            //
+            // isOperational() can be used to check if the required native libraries are currently
+            // available.  The detectors will automatically become operational once the library
+            // downloads complete on device.
+            Log.w(TAG, "Detector dependencies are not yet available.");
+
+            // Check for low storage.  If there is low storage, the native library will not be
+            // downloaded, so detection will not become operational.
+            IntentFilter lowstorageFilter = new IntentFilter(Intent.ACTION_DEVICE_STORAGE_LOW);
+            boolean hasLowStorage = registerReceiver(null, lowstorageFilter) != null;
+
+            if (hasLowStorage) {
+                Toast.makeText(this, R.string.low_storage_error, Toast.LENGTH_LONG).show();
+                Log.w(TAG, getString(R.string.low_storage_error));
+            }
+        }
+
+        DisplayMetrics metrics = new DisplayMetrics();
+        getWindowManager().getDefaultDisplay().getMetrics(metrics);
+
+        // Creates and starts the camera.  Note that this uses a higher resolution in comparison
+        // to other detection examples to enable the barcode detector to detect small barcodes
+        // at long distances.
+        @SuppressWarnings("SuspiciousNameCombination")
+        CameraSourceBase.Builder builder = new CameraSourceBase.Builder(getApplicationContext(), barcodeDetector)
+                .setFacing(CameraSourceBase.CAMERA_FACING_BACK)
+                .setRequestedPreviewSize(metrics.heightPixels, metrics.widthPixels)
+                .setRequestedFps(30.0f);
+
+        // make sure that auto focus is an available option
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH)
+            builder = builder.setFocusMode(
+                    autoFocus ? Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE : null);
+
+        mCameraSource = builder
+                .setFlashMode(useFlash ? Camera.Parameters.FLASH_MODE_TORCH : null)
+                .build();
+    }
 
     /**
      * Restarts the camera.
      */
-//    @Override
-//    protected void onResume() {
-//        super.onResume();
-//        startCameraSource();
-//    }
-//
-//    /**
-//     * Stops the camera.
-//     */
-//    @Override
-//    protected void onPause() {
-//        super.onPause();
-//        if (mPreview != null) {
-//            mPreview.stop();
-//        }
-//    }
-//
-//    /**
-//     * Releases the resources associated with the camera source, the associated detectors, and the
-//     * rest of the processing pipeline.
-//     */
-//    @Override
-//    protected void onDestroy() {
-//        super.onDestroy();
-//        if (mPreview != null) {
-//            mPreview.release();
-//        }
-//    }
-
     @Override
     protected void onResume() {
         super.onResume();
-
-//        workflowModel.markCameraFrozen();
-//        settingsButton.setEnabled(true);
-//        currentWorkflowState = WorkflowState.NOT_STARTED;
-//        cameraSource.setFrameProcessor(new BarcodeProcessor(graphicOverlay, workflowModel));
-//        workflowModel.setWorkflowState(WorkflowState.DETECTING);
         startCameraSource();
-
     }
 
-    @Override
-    protected void onPostResume() {
-        super.onPostResume();
-//        BarcodeResultFragment.dismiss(getSupportFragmentManager());
-    }
-
+    /**
+     * Stops the camera.
+     */
     @Override
     protected void onPause() {
         super.onPause();
-//        currentWorkflowState = WorkflowState.NOT_STARTED;
-//        stopCameraPreview();
-        flashButton.setSelected(false);
-        mPreview.stop();
+        if (mPreview != null) {
+            mPreview.stop();
+        }
     }
 
+    /**
+     * Releases the resources associated with the camera source, the associated detectors, and the
+     * rest of the processing pipeline.
+     */
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (cameraSource != null) {
-            cameraSource.release();
-            cameraSource = null;
+        if (mPreview != null) {
+            mPreview.release();
         }
     }
 
@@ -528,7 +454,7 @@ public final class BarcodeCaptureActivity extends AppCompatActivity implements B
 
         if (grantResults.length != 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             Log.d(TAG, "Camera permission granted - initialize the camera source");
-            //createCameraSource(autoFocus,useFlash);
+            createCameraSource(autoFocus,useFlash);
             return;
         }
 
@@ -573,7 +499,6 @@ public final class BarcodeCaptureActivity extends AppCompatActivity implements B
             }
         }
     }
-
 
     /**
      * Multiple events can be fired depending the number of barcodes identified,
